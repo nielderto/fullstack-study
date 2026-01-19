@@ -1,4 +1,6 @@
 import express from "express";
+import { db } from "./db.js";
+import { cars } from "./schema.js";
 
 const app = express();
 const PORT = 3001;
@@ -12,18 +14,13 @@ app.use((req, res, next) =>{
     next();
 })
 
-let cars = [
-    {id: 1, make: "Toyota", model: "Camry", year: 2020, price: 20000},
-    {id: 2, make: "Ford", model: "F150", year: 2021, price: 30000},
-    {id: 3, make: "Chevrolet", model: "Silverado", year: 2022, price: 40000},
-] 
-
 app.get("/", (req, res) => {
     res.send("Welcome to route 1");
 });
 
-router.get("/", (req, res) => {
-    res.json(cars);
+router.get("/", async (req, res) => {
+    const allCars = await db.select().from(cars);
+    res.json(allCars);
 });
 
 router.get("/:id", (req, res) => {
@@ -36,21 +33,12 @@ router.get("/:id", (req, res) => {
     res.json(car);
 })
 
-router.post("/", (req, res) =>{
+router.post("/", async (req, res) =>{
     const { make, model, year, price } = req.body;
-    let lastId = cars[cars.length - 1].id;
 
     if ( !make || !model || !year || !price ) return res.status(404).send("Please provide all the necessary fields!");
 
-    const newCar = {
-        id: ++lastId,
-        make,
-        model,
-        year: Number(year),
-        price: Number(price)
-    }
-
-    cars.push(newCar);
+    const [newCar] = await db.insert(cars).values({make, model, year, price}).returning();
 
     res.status(202).send(`New car created: ${newCar.make} ${newCar.model} ${newCar.year}`);
 })
@@ -69,13 +57,13 @@ router.put("/:id", (req, res) => {
     res.status(200).send(`Car ${cars[index].make} ${cars[index].model} ${cars[index].year} updated successfully!`);
 })
 
-router.delete("/:id", (req, res) =>{
+router.delete("/:id", async (req, res) =>{
     const id = Number(req.params.id);
     const index = cars.findIndex(item => item.id === id);
 
     if (index === -1) return res.status(404).send("Car id not found, please input the correct id!");
 
-    const deletedCar = cars.splice(index, 1)[0];
+    const deletedCar = await db.delete(cars).where(eq(cars.id, id)).returning();
 
     res.status(200).send(`${deletedCar.make} ${deletedCar.model} ${deletedCar.year} deleted successfully!`);
 })
